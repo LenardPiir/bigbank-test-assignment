@@ -1,0 +1,3 @@
+rootProject.name = 'dragons-of-mugloar'
+
+includeBuild('backend')
