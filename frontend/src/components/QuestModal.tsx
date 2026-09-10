@@ -173,7 +173,7 @@ const ILLUSTRATIONS = [
 
 export default function QuestModal() {
   const questModal = useGameStore((s) => s.questModal);
-  const dismissQuestModal = useGameStore((s) => s.dismissQuestModal);
+  const dismissQuestModal = useGameStore((gameStore) => gameStore.dismissQuestModal);
 
   if (!questModal) return null;
 

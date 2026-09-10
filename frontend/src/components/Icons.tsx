@@ -190,26 +190,40 @@ function QuestIcon() {
   );
 }
 
+type IconMatch = { keywords: string[]; icon: () => React.JSX.Element; exclude?: string[] };
+
+const SHOP_ICONS: IconMatch[] = [
+  { keywords: ['potion'], icon: PotionIcon, exclude: ['wing'] },
+  { keywords: ['claw'], icon: ClawIcon },
+  { keywords: ['gasoline', 'fuel', 'rocket'], icon: FuelIcon },
+  { keywords: ['plating', 'iron', 'copper'], icon: ArmorIcon },
+  { keywords: ['book', 'trick'], icon: BookIcon },
+  { keywords: ['wing'], icon: WingsIcon },
+];
+
+const QUEST_ICONS: IconMatch[] = [
+  { keywords: ['escort'], icon: EscortIcon },
+  { keywords: ['steal'], icon: StealIcon },
+  { keywords: ['clean'], icon: CleanIcon },
+  { keywords: ['fix'], icon: FixIcon },
+  { keywords: ['transport'], icon: TransportIcon },
+  { keywords: ['write', 'novel'], icon: ScrollIcon },
+  { keywords: ['agreement'], icon: AgreementIcon },
+  { keywords: ['advertisement', 'campaign'], icon: ScrollIcon },
+];
+
+function matchIcon(text: string, rules: IconMatch[], fallback: () => React.JSX.Element) {
+  const lower = text.toLowerCase();
+  const match = rules.find(
+    (r) => r.keywords.some((k) => lower.includes(k)) && !r.exclude?.some((k) => lower.includes(k)),
+  );
+  return match?.icon ?? fallback;
+}
+
 export function getShopIcon(name: string) {
-  const lower = name.toLowerCase();
-  if (lower.includes('potion') && !lower.includes('wing')) return PotionIcon;
-  if (lower.includes('claw')) return ClawIcon;
-  if (lower.includes('gasoline') || lower.includes('fuel') || lower.includes('rocket')) return FuelIcon;
-  if (lower.includes('plating') || lower.includes('iron') || lower.includes('copper')) return ArmorIcon;
-  if (lower.includes('book') || lower.includes('trick')) return BookIcon;
-  if (lower.includes('wing')) return WingsIcon;
-  return PotionIcon;
+  return matchIcon(name, SHOP_ICONS, PotionIcon);
 }
 
 export function getQuestIcon(message: string) {
-  const lower = message.toLowerCase();
-  if (lower.startsWith('escort')) return EscortIcon;
-  if (lower.startsWith('steal')) return StealIcon;
-  if (lower.includes('clean')) return CleanIcon;
-  if (lower.includes('fix')) return FixIcon;
-  if (lower.includes('transport')) return TransportIcon;
-  if (lower.includes('write') || lower.includes('novel')) return ScrollIcon;
-  if (lower.includes('agreement')) return AgreementIcon;
-  if (lower.includes('advertisement') || lower.includes('campaign')) return ScrollIcon;
-  return QuestIcon;
+  return matchIcon(message, QUEST_ICONS, QuestIcon);
 }

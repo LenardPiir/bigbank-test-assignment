@@ -28,37 +28,30 @@ export function riskAdjustedScore(ad: Ad, lives: number): number {
   return (ad.reward * rate - lifeCost * (1 - rate)) / urgency;
 }
 
-export function riskBadgeColor(probability: string): string {
-  const rate = successRate(probability);
-  if (rate >= 0.7) return 'bg-emerald-800 text-emerald-100 border-emerald-900';
-  if (rate >= 0.4) return 'bg-yellow-700 text-yellow-100 border-yellow-900';
-  if (rate >= 0.15) return 'bg-orange-800 text-orange-100 border-orange-900';
-  return 'bg-red-900 text-red-100 border-red-950';
+interface RiskTier {
+  min: number;
+  level: string;
+  color: string;
+  badge: string;
+  description: string;
 }
 
-export function riskLevel(probability: string): string {
+const RISK_TIERS: RiskTier[] = [
+  { min: 0.7, level: 'Safe', color: 'text-emerald-800', badge: 'bg-emerald-800 text-emerald-100 border-emerald-900', description: 'Good odds of completing this quest.' },
+  { min: 0.4, level: 'Moderate risk', color: 'text-yellow-700', badge: 'bg-yellow-700 text-yellow-100 border-yellow-900', description: 'Could go either way — proceed with caution.' },
+  { min: 0.15, level: 'Dangerous', color: 'text-orange-700', badge: 'bg-orange-800 text-orange-100 border-orange-900', description: 'More likely to fail than succeed.' },
+  { min: -Infinity, level: 'Deadly', color: 'text-red-800', badge: 'bg-red-900 text-red-100 border-red-950', description: 'Almost certain to fail — expect to lose a life.' },
+];
+
+function riskTier(probability: string): RiskTier {
   const rate = successRate(probability);
-  if (rate >= 0.7) return 'Safe';
-  if (rate >= 0.4) return 'Moderate risk';
-  if (rate >= 0.15) return 'Dangerous';
-  return 'Deadly';
+  return RISK_TIERS.find((t) => rate >= t.min)!;
 }
 
-export function riskDescription(probability: string): string {
-  const rate = successRate(probability);
-  if (rate >= 0.7) return 'Good odds of completing this quest.';
-  if (rate >= 0.4) return 'Could go either way — proceed with caution.';
-  if (rate >= 0.15) return 'More likely to fail than succeed.';
-  return 'Almost certain to fail — expect to lose a life.';
-}
-
-export function riskLevelColor(probability: string): string {
-  const rate = successRate(probability);
-  if (rate >= 0.7) return 'text-emerald-800';
-  if (rate >= 0.4) return 'text-yellow-700';
-  if (rate >= 0.15) return 'text-orange-700';
-  return 'text-red-800';
-}
+export function riskBadgeColor(probability: string) { return riskTier(probability).badge; }
+export function riskLevel(probability: string) { return riskTier(probability).level; }
+export function riskDescription(probability: string) { return riskTier(probability).description; }
+export function riskLevelColor(probability: string) { return riskTier(probability).color; }
 
 function decodeBase64(value: string): string {
   const binary = atob(value);
@@ -75,9 +68,9 @@ function decodeRot13(value: string): string {
 
 export function decodeAd(ad: Ad): Ad {
   if (!ad.encrypted) return ad;
-  const enc = String(ad.encrypted);
-  let decode: (v: string) => string;
-  if (enc === '1') {
+  const encryptedAd = String(ad.encrypted);
+  let decode: (value: string) => string;
+  if (encryptedAd === '1') {
     decode = decodeBase64;
   } else {
     decode = decodeRot13;

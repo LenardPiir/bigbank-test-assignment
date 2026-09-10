@@ -13,8 +13,8 @@ export default function GameLog() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const el = containerRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    const element = containerRef.current;
+    if (element) element.scrollTop = element.scrollHeight;
   }, [log.length]);
 
   return (
