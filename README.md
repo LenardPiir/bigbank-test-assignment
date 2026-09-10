@@ -1,102 +1,42 @@
 # Dragons of Mugloar
 
-A two-part solution for the [Dragons of Mugloar](https://dragonsofmugloar.com) game.
+The backend is an automated bot that plays the [Dragons of Mugloar](https://dragonsofmugloar.com) game and scores 1000+ points per run. The frontend is a web app that lets you play the game manually through the browser.
 
-## Project structure
+## How to run
 
-```
-backend/    Java game bot (Gradle)
-frontend/   React web app (Vite)
-```
-
-## Part 1 — Game Bot (Java)
-
-An automated game bot that reliably scores 1000+ points by solving quests and managing resources.
-
-### Architecture
-
-The project follows a **ports-and-adapters** pattern:
-
-- `ee.bigbank.mugloar.domain` — Core game logic (GameLoop, AdRanker, AdDecoder, GameRunner)
-- `ee.bigbank.mugloar.infrastructure` — HTTP client implementation (HttpGameClient)
-
-### Key features
-
-- **Risk-adjusted scoring** — Ads are ranked by `(reward × successProbability − lifeCost × (1 − successProbability)) / urgency`, balancing reward against risk
-- **Adaptive strategy** — The bot adjusts risk tolerance based on current lives and game level
-- **Encrypted ad decoding** — Handles Base64 and ROT13 encrypted messages
-- **Retry with backoff** — HTTP requests include retry logic with exponential backoff for rate limiting
-- **Success rate tracking** — Learns actual success rates from game outcomes
-
-### Running
+Requires Docker
 
 ```bash
-cd backend
-./gradlew run
+docker compose up --build
 ```
 
-### Testing
+The bot starts playing immediately and prints game progress to the console. The frontend is available at http://localhost:3000.
+
+## Backend
+
+### What to expect
+
+The bot plays a full game autonomously. Each run prints the quests it solves, items it buys, and the final score. A typical game scores between 1000 and 6000+ points depending on quest availability.
+
+### How it works
+
+The bot starts a game, then loops through turns until it runs out of lives:
+
+1. Fetches available quests and decodes any that are encrypted (Base64, ROT13)
+2. Ranks quests by tracked success rate per difficulty tier, breaking ties by reward
+3. Skips quests that are too risky for the current life count
+4. Solves the best available quest
+5. Buys healing potions when gold allows and lives are low
+6. Repeats until game over
+
+Success rates are learned from outcomes during the run — the bot starts with the advertised probabilities and adjusts as it sees real results.
+
+### Tests
 
 ```bash
-cd backend
-./gradlew test
+docker compose run --rm bot ./gradlew test
 ```
 
-### Docker
+## Frontend
 
-```bash
-docker build -t mugloar-bot .
-docker run mugloar-bot
-```
-
-## Part 2 — Web App (React)
-
-A browser-based frontend that lets players manually play the game through the API.
-
-### Tech stack
-
-- React 18 + TypeScript
-- Vite (dev server and build)
-- Zustand (state management)
-- Tailwind CSS v4
-
-### Features
-
-- Start a new game
-- View available quests sorted by risk-adjusted score
-- Solve quests and track results
-- Browse and purchase shop items
-- Live player stats (score, gold, lives, level, turn)
-- Color-coded risk badges with hover tooltips
-- Local leaderboard tracking best runs
-- Game log tracking all actions
-- Responsive layout (mobile, tablet, desktop)
-
-### Running
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-The app runs at `http://localhost:5173`. The Vite dev server proxies API requests to `https://dragonsofmugloar.com`.
-
-### Testing
-
-```bash
-cd frontend
-npm test
-```
-
-### Building for production
-
-```bash
-cd frontend
-npm run build
-```
-
-## Prerequisites
-
-- Java 21+
-- Node.js 20+
+The game has an in-game guide that explains the interface. Turn on the music for the full experience.
