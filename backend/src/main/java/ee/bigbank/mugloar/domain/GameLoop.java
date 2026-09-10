@@ -13,10 +13,7 @@ public class GameLoop {
     static final int HEALING_POTION_COST = 50;
     static final int HEALTHY_LIVES = 4;
     private static final String HEALING_POTION = "Healing potion";
-    private static final int CRITICAL_LIVES = 1;
-    private static final int LOW_LIVES = 2;
-    private static final int EARLY_GAME_LEVEL = 3;
-    private static final int MID_GAME_LEVEL = 10;
+    private static final int HEAL_BEFORE_QUEST_THRESHOLD = 3;
 
     private final GameClient client;
     private final SuccessRateTracker successRateTracker;
@@ -40,19 +37,11 @@ public class GameLoop {
     }
 
     private GameState playTurn(GameState state, List<Ad> ads) {
-        List<Ad> safeAds = filterSafeAds(ads, state);
-        Ad bestAd = chooseBestAd(ads, safeAds, state);
-        double expectedValue = AdRanker.riskAdjustedScore(bestAd, successRateTracker, state.lives());
+        GameState current = healBeforeQuest(state);
 
-        if (safeAds.isEmpty() || expectedValue < 0) {
-            GameState stateAfterTurnSkip = attemptToSkipTurn(state);
-            if (stateAfterTurnSkip.turn() != state.turn()) {
-                log.debug("Turn {}: skipping (best EV {})", state.turn(), String.format("%.1f", expectedValue));
-                return stateAfterTurnSkip;
-            }
-        }
+        Ad bestAd = AdRanker.rank(ads, successRateTracker, current.lives()).getFirst();
 
-        GameState stateAfterSolving = solveAd(state, bestAd, expectedValue);
+        GameState stateAfterSolving = solveAd(current, bestAd);
 
         if (stateAfterSolving.lives() > 0) {
             return attemptToBuyItem(stateAfterSolving);
@@ -61,61 +50,31 @@ public class GameLoop {
         return stateAfterSolving;
     }
 
+    private GameState healBeforeQuest(GameState state) {
+        if (state.lives() >= HEAL_BEFORE_QUEST_THRESHOLD || state.gold() < HEALING_POTION_COST) {
+            return state;
+        }
+        List<ShopItem> items = client.getShopItems(state.gameId());
+        return attemptToBuyHealingPotion(state, items);
+    }
+
     private List<Ad> fetchDecodedAds(GameState state) {
         return client.getAds(state.gameId()).stream()
                 .map(AdDecoder::decode)
                 .toList();
     }
 
-    private Ad chooseBestAd(List<Ad> ads, List<Ad> safeAds, GameState state) {
-        List<Ad> candidates = safeAds.isEmpty() ? ads : safeAds;
-        return AdRanker.rank(candidates, successRateTracker, state.lives()).getFirst();
-    }
-
-    private List<Ad> filterSafeAds(List<Ad> ads, GameState state) {
-        ProbabilityTier maxAllowed = maxAllowedTier(state);
-        return ads.stream()
-                .filter(ad -> ProbabilityTier.fromLabel(ad.probability()).ordinal() <= maxAllowed.ordinal())
-                .toList();
-    }
-
-    private GameState solveAd(GameState state, Ad ad, double expectedValue) {
+    private GameState solveAd(GameState state, Ad ad) {
         SolveResult result = client.solve(state.gameId(), ad.adId());
         successRateTracker.recordAttempt(ProbabilityTier.fromLabel(ad.probability()), state.level(), result.success());
 
         GameState updatedState = state.withSolveResult(result);
 
-        log.debug("Turn {} [{} ev={}]: success={} score={} gold={} lives={} level={}",
-                updatedState.turn(), ad.probability(), String.format("%.1f", expectedValue), result.success(),
+        log.debug("Turn {} [{}]: success={} score={} gold={} lives={} level={}",
+                updatedState.turn(), ad.probability(), result.success(),
                 updatedState.score(), updatedState.gold(), updatedState.lives(), updatedState.level());
 
         return updatedState;
-    }
-
-    private ProbabilityTier maxAllowedTier(GameState state) {
-        if (state.lives() <= CRITICAL_LIVES) return ProbabilityTier.PIECE_OF_CAKE;
-        if (state.lives() <= LOW_LIVES) return ProbabilityTier.WALK_IN_THE_PARK;
-        if (state.level() < EARLY_GAME_LEVEL) return ProbabilityTier.QUITE_LIKELY;
-        if (state.level() < MID_GAME_LEVEL) return ProbabilityTier.GAMBLE;
-        return ProbabilityTier.IMPOSSIBLE;
-    }
-
-    private GameState attemptToSkipTurn(GameState state) {
-        List<ShopItem> items = client.getShopItems(state.gameId());
-        int availableGold = state.gold();
-
-        Optional<ShopItem> itemToBuy = bestStatItem(items, availableGold)
-                .or(() -> cheapestAffordableItem(items, availableGold));
-
-        return itemToBuy
-                .map(item -> buyAndLog(state, item))
-                .orElse(state);
-    }
-
-    private Optional<ShopItem> cheapestAffordableItem(List<ShopItem> items, int availableGold) {
-        return items.stream()
-                .filter(shopItem -> shopItem.cost() <= availableGold)
-                .min(Comparator.comparingInt(ShopItem::cost));
     }
 
     private GameState attemptToBuyItem(GameState state) {

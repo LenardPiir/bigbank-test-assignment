@@ -6,7 +6,7 @@ import ee.bigbank.mugloar.infrastructure.HttpGameClient;
 
 public class Main {
 
-    private static final int GAME_RUNS = 5;
+    private static final int GAME_RUNS = 20;
 
     public static void main(String[] args) {
         SuccessRateTracker successRateTracker = new SuccessRateTracker();

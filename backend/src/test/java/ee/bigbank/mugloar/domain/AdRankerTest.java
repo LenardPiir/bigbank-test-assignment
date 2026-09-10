@@ -22,57 +22,44 @@ class AdRankerTest {
     }
 
     @Test
-    void whenRewardsAreEqualAdExpiringSoonerRanksFirst() {
-        Ad expiresLater = aSureThing("1", A_DEFAULT_REWARD, A_LONG_EXPIRY);
-        Ad expiresSooner = aSureThing("2", A_DEFAULT_REWARD, A_URGENT_EXPIRY);
-
-        List<Ad> ranked = AdRanker.rank(List.of(expiresLater, expiresSooner), aSuccessRateTracker(), A_DEFAULT_LIVES);
-
-        assertEquals(expiresSooner, ranked.get(0));
-        assertEquals(expiresLater, ranked.get(1));
-    }
-
-    @Test
-    void ranksByUrgencyWeightedScoreRatherThanRewardAlone() {
-        Ad highRewardButNotUrgent = aSureThing("1", A_MEDIUM_REWARD, A_LONG_EXPIRY);
-        Ad lowRewardButUrgent = aSureThing("2", A_DEFAULT_REWARD, A_URGENT_EXPIRY);
-
-        List<Ad> ranked = AdRanker.rank(List.of(highRewardButNotUrgent, lowRewardButUrgent), aSuccessRateTracker(), A_DEFAULT_LIVES);
-
-        assertEquals(lowRewardButUrgent, ranked.get(0));
-        assertEquals(highRewardButNotUrgent, ranked.get(1));
-    }
-
-    @Test
-    void adsExpiringThisTurnRankAboveEverythingElse() {
-        Ad expiringNow = aSureThing("1", A_MEDIUM_REWARD, A_IMMEDIATE_EXPIRY);
-        Ad notUrgent = aSureThing("2", A_MEDIUM_REWARD, A_LONG_EXPIRY);
-
-        List<Ad> ranked = AdRanker.rank(List.of(notUrgent, expiringNow), aSuccessRateTracker(), A_DEFAULT_LIVES);
-
-        assertEquals(expiringNow, ranked.get(0));
-        assertEquals(notUrgent, ranked.get(1));
-    }
-
-    @Test
-    void whenMultipleAdsExpireThisTurnHigherRewardRanksFirstAmongThem() {
-        Ad expiringNowLowReward = aSureThing("1", A_DEFAULT_REWARD, A_IMMEDIATE_EXPIRY);
-        Ad expiringNowHighReward = aSureThing("2", A_HIGH_REWARD, A_IMMEDIATE_EXPIRY);
-
-        List<Ad> ranked = AdRanker.rank(List.of(expiringNowLowReward, expiringNowHighReward), aSuccessRateTracker(), A_DEFAULT_LIVES);
-
-        assertEquals(expiringNowHighReward, ranked.get(0));
-        assertEquals(expiringNowLowReward, ranked.get(1));
-    }
-
-    @Test
-    void saferAdRanksAboveRiskierAdWhenUrgencyScoresAreEqual() {
+    void saferAdRanksAboveRiskierAdRegardlessOfReward() {
         Ad safe = aSureThing("1", A_DEFAULT_REWARD, A_DEFAULT_EXPIRY);
-        Ad risky = anAd("2", A_DEFAULT_REWARD, A_DEFAULT_EXPIRY, ProbabilityTier.GAMBLE);
+        Ad risky = anAd("2", A_HIGH_REWARD, A_DEFAULT_EXPIRY, ProbabilityTier.GAMBLE);
 
-        List<Ad> ranked = AdRanker.rank(List.of(safe, risky), aSuccessRateTracker(), A_DEFAULT_LIVES);
+        List<Ad> ranked = AdRanker.rank(List.of(risky, safe), aSuccessRateTracker(), A_DEFAULT_LIVES);
 
         assertEquals(safe, ranked.getFirst());
+    }
+
+    @Test
+    void withinSameTierHigherRewardRanksFirst() {
+        Ad lowReward = anAd("1", A_DEFAULT_REWARD, A_DEFAULT_EXPIRY, ProbabilityTier.HMMM);
+        Ad highReward = anAd("2", A_HIGH_REWARD, A_DEFAULT_EXPIRY, ProbabilityTier.HMMM);
+
+        List<Ad> ranked = AdRanker.rank(List.of(lowReward, highReward), aSuccessRateTracker(), A_DEFAULT_LIVES);
+
+        assertEquals(highReward, ranked.getFirst());
+        assertEquals(lowReward, ranked.get(1));
+    }
+
+    @Test
+    void prefersSaferAdEvenWhenRiskyAdHasHigherReward() {
+        Ad risky = anAd("1", A_HIGH_REWARD, A_URGENT_EXPIRY, ProbabilityTier.SUICIDE_MISSION);
+        Ad safe = aSureThing("2", A_DEFAULT_REWARD, A_DEFAULT_EXPIRY);
+
+        List<Ad> ranked = AdRanker.rank(List.of(risky, safe), aSuccessRateTracker(), A_DEFAULT_LIVES);
+
+        assertEquals(safe, ranked.getFirst());
+    }
+
+    @Test
+    void whenAllAdsAreRiskyPicksSafestTierFirst() {
+        Ad worse = anAd("1", A_HIGH_REWARD, A_DEFAULT_EXPIRY, ProbabilityTier.IMPOSSIBLE);
+        Ad better = anAd("2", A_DEFAULT_REWARD, A_DEFAULT_EXPIRY, ProbabilityTier.PLAYING_WITH_FIRE);
+
+        List<Ad> ranked = AdRanker.rank(List.of(worse, better), aSuccessRateTracker(), A_DEFAULT_LIVES);
+
+        assertEquals(better, ranked.getFirst());
     }
 
     @Test
@@ -86,23 +73,13 @@ class AdRankerTest {
     }
 
     @Test
-    void whenAllAdsAreRiskyPicksLeastRiskyRatherThanHighestReward() {
-        Ad worseRiskHigherUrgency = anAd("1", A_HIGH_REWARD, A_URGENT_EXPIRY, ProbabilityTier.IMPOSSIBLE);
-        Ad betterRiskLowerUrgency = anAd("2", A_DEFAULT_REWARD, A_DEFAULT_EXPIRY, ProbabilityTier.PLAYING_WITH_FIRE);
+    void urgencyDoesNotAffectRanking() {
+        Ad urgent = aSureThing("1", A_DEFAULT_REWARD, A_URGENT_EXPIRY);
+        Ad notUrgent = aSureThing("2", A_DEFAULT_REWARD, A_LONG_EXPIRY);
 
-        List<Ad> ranked = AdRanker.rank(List.of(worseRiskHigherUrgency, betterRiskLowerUrgency), aSuccessRateTracker(), A_DEFAULT_LIVES);
+        List<Ad> ranked = AdRanker.rank(List.of(urgent, notUrgent), aSuccessRateTracker(), A_DEFAULT_LIVES);
 
-        assertEquals(betterRiskLowerUrgency, ranked.getFirst());
-    }
-
-    @Test
-    void prefersSaferAdEvenWhenRiskyAdHasHigherUrgency() {
-        Ad risky = anAd("1", A_MEDIUM_REWARD, A_URGENT_EXPIRY, ProbabilityTier.SUICIDE_MISSION);
-        Ad safe = aSureThing("2", A_DEFAULT_REWARD, A_DEFAULT_EXPIRY);
-
-        List<Ad> ranked = AdRanker.rank(List.of(risky, safe), aSuccessRateTracker(), A_DEFAULT_LIVES);
-
-        assertEquals(safe, ranked.getFirst());
+        assertEquals(ranked.get(0).reward(), ranked.get(1).reward());
     }
 
     @Test
@@ -132,17 +109,5 @@ class AdRankerTest {
         double scoreWithManyLives = AdRanker.riskAdjustedScore(ad, tracker, 10);
 
         assertTrue(scoreWithManyLives > scoreWithFewLives);
-    }
-
-    @Test
-    void urgentAdScoresHigherThanIdenticalNonUrgentAd() {
-        Ad urgent = aSureThing("1", A_MEDIUM_REWARD, A_URGENT_EXPIRY);
-        Ad relaxed = aSureThing("2", A_MEDIUM_REWARD, A_LONG_EXPIRY);
-        SuccessRateTracker tracker = aSuccessRateTracker();
-
-        double urgentScore = AdRanker.riskAdjustedScore(urgent, tracker, A_DEFAULT_LIVES);
-        double relaxedScore = AdRanker.riskAdjustedScore(relaxed, tracker, A_DEFAULT_LIVES);
-
-        assertTrue(urgentScore > relaxedScore);
     }
 }
