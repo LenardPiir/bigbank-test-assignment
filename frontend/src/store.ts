@@ -3,6 +3,7 @@ import { GameState, Ad, ShopItem, SolveResult, Reputation } from './types';
 import { api } from './api';
 import { decodeAd, successRate } from './utils';
 import { saveEntry } from './components/Leaderboard';
+import { audioEngine } from './audio';
 
 export interface LogEntry {
   turn: number;
@@ -57,6 +58,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     try {
       const game = await api.startGame();
       set({ game, loading: false });
+      audioEngine.startAdventure();
       await get().fetchAds();
       await get().fetchShop();
       await get().fetchReputation();
@@ -99,9 +101,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
         tipIndex: Math.floor(Math.random() * TIP_COUNT),
       },
     });
+    audioEngine.startQuest();
 
     try {
       const result = await api.solve(game.gameId, adId);
+
       const updatedGame: GameState = {
         ...game,
         lives: result.lives,
@@ -121,7 +125,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
       };
 
       if (updatedGame.lives <= 0) {
+        audioEngine.stop();
+        audioEngine.playGameOver();
         saveEntry({ score: updatedGame.score, gold: updatedGame.gold, level: updatedGame.level, turn: updatedGame.turn });
+      } else {
+        audioEngine.stopQuest();
+        if (result.success) audioEngine.playSuccess();
+        else audioEngine.playFailure();
+        // ambient resumes on modal dismiss
       }
 
       set((state) => ({
@@ -133,7 +144,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
           : null,
       }));
     } catch {
-      set({ error: 'That quest is no longer available.', loading: false, questModal: null });
+      audioEngine.resumeAdventure();
+      set({ error: 'That quest expired — the board has been refreshed.', loading: false, questModal: null });
       await get().fetchAds();
     }
   },
@@ -142,6 +154,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { game } = get();
     set({ questModal: null });
     if (game && game.lives > 0) {
+      audioEngine.resumeAdventure();
       await get().fetchAds();
       await get().fetchShop();
       await get().fetchReputation();
@@ -201,6 +214,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   clearError: () => set({ error: null }),
 
-  reset: () =>
-    set({ game: null, ads: [], shopItems: [], reputation: null, log: [], loading: false, error: null, questModal: null }),
+  reset: () => {
+    audioEngine.stop();
+    set({ game: null, ads: [], shopItems: [], reputation: null, log: [], loading: false, error: null, questModal: null });
+  },
 }));

@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useGameStore } from './store';
+import { audioEngine } from './audio';
 import PlayerStats from './components/PlayerStats';
 import AdList from './components/AdList';
 import Shop from './components/Shop';
@@ -64,6 +65,36 @@ function LeaderboardIcon() {
   );
 }
 
+function MuteButton() {
+  const [isMuted, setIsMuted] = useState(audioEngine.isMuted());
+  const toggle = useCallback(() => setIsMuted(audioEngine.toggleMute()), []);
+
+  return (
+    <button
+      onClick={toggle}
+      className="w-8 h-8 rounded-full flex items-center justify-center text-[var(--parchment-dark)] hover:text-[var(--gold)] cursor-pointer transition-colors"
+      style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid var(--border-ornate)' }}
+      title={isMuted ? 'Unmute' : 'Mute'}
+    >
+      <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
+        {isMuted ? (
+          <>
+            <path d="M11 5L6 9H2v6h4l5 4V5z" />
+            <line x1="23" y1="9" x2="17" y2="15" />
+            <line x1="17" y1="9" x2="23" y2="15" />
+          </>
+        ) : (
+          <>
+            <path d="M11 5L6 9H2v6h4l5 4V5z" />
+            <path d="M15.54 8.46a5 5 0 010 7.07" />
+            <path d="M19.07 4.93a10 10 0 010 14.14" />
+          </>
+        )}
+      </svg>
+    </button>
+  );
+}
+
 const PANELS: { id: Exclude<PanelId, null>; label: string; icon: () => JSX.Element }[] = [
   { id: 'merchant', label: 'Merchant', icon: MerchantIcon },
   { id: 'reputation', label: 'Reputation', icon: ReputationIcon },
@@ -115,9 +146,12 @@ export default function App() {
 
       <header className="dark-panel relative z-10">
         <div className="max-w-7xl mx-auto px-4 py-4">
-          <h1 className="text-xl font-bold text-[var(--gold)] mb-3 tracking-wider">
-            Dragons of Mugloar
-          </h1>
+          <div className="flex items-center gap-3 mb-3">
+            <h1 className="text-xl font-bold text-[var(--gold)] tracking-wider">
+              Dragons of Mugloar
+            </h1>
+            <MuteButton />
+          </div>
           <PlayerStats />
         </div>
       </header>
